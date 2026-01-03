@@ -18,12 +18,18 @@ PDFNetworker.exe [command] [options]
 ### コマンド一覧
 
 PDFNETWorker.exe paging <src> <dest> <FreeLicense> <pageInfoJson>
-Usage: PDFNETWorker.exe imageonly <pagerawInfoJson> <dest>
-Usage: PDFNETWorker.exe stamp <read> <dest> <freeLicense> <xml>
-Usage: PDFNETWorker.exe merge <read>
-Usage: PDFNETWorker.exe getpagerotation <read> <pageNumber>
-Usage: PDFNETWorker.exe makeblankpage
-Usage: PDFNETWorker.exe pdf2png <pdfPath> <outputJson>
+
+PDFNETWorker.exe imageonly <pagerawInfoJson> <dest>
+
+PDFNETWorker.exe stamp <read> <dest> <freeLicense> <xml>
+
+PDFNETWorker.exe merge <read>
+
+PDFNETWorker.exe getpagerotation <read> <pageNumber>
+
+PDFNETWorker.exe makeblankpage
+
+PDFNETWorker.exe pdf2png <pdfPath> <outputJson>
            
 
 ### 出力先について

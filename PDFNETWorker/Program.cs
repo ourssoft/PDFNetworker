@@ -13,7 +13,13 @@ using System.Reflection;
 using System.Text;
 class Program
 {
-    static int Main(string[] args)
+    [STAThread]
+    static void Main(string[] args)
+    {
+        int result = RunWorker(args);
+        Environment.Exit(result);
+    }
+    static int RunWorker(string[] args)
     {
 
         // これを最初に呼ぶ

@@ -42,23 +42,21 @@ class Program
                 return 1;
             case "paging":
                 {
-                    if (args.Length < 5)
+                    if (args.Length < 4)
                     {
-                        Console.Error.WriteLine("Usage: PDFNETWorker.exe paging <src> <dest> <FreeLicense> <pageInfoJson>");
+                        Console.Error.WriteLine("Usage: PDFNETWorker.exe paging <src> <dest> <pageInfoJson>");
                         return 1;
                     }
 
                     string src = args[1];
                     string dest = args[2];
-                    string freeLicense = args[3];
-                    string pageInfoJson = args[4];
+                    string pageInfoJson = args[3];
 
-                    if (freeLicense.ToLower() != "false") freeLicense = "true";
                     try
                     {
                         var pageInfos = JsonConvert.DeserializeObject<List<PageInfo>>(File.ReadAllText(pageInfoJson));
                         var worker = new PdfPagingWorker();
-                        worker.savePagingPDF(src, dest, bool.Parse(freeLicense), pageInfos);
+                        worker.savePagingPDF(src, dest, pageInfos);
                         return 0;
                     }
                     catch (Exception ex)
@@ -97,23 +95,21 @@ class Program
 
             case "stamp":
                 {
-                    if (args.Length < 5)
+                    if (args.Length < 4)
                     {
-                        Console.Error.WriteLine("Usage: PDFNETWorker.exe stamp <read> <dest> <freeLicense> <xml>");
+                        Console.Error.WriteLine("Usage: PDFNETWorker.exe stamp <read> <dest> <xml>");
                         return 1;
                     }
 
                     string read = args[1];
                     string dest = args[2];
-                    string freeLicense = args[3];
-                    if (freeLicense.ToLower() != "false") freeLicense = "true";
-
-                    string xml = args[4];
+                    
+                    string xml = args[3];
 
                     try
                     {
                         var worker = new PdfPagingWorker();
-                        worker.EmbedStamp(read, dest, freeLicense, xml);
+                        worker.EmbedStamp(read, dest, xml);
                         return 0;
                     }
                     catch (Exception ex)
@@ -272,7 +268,7 @@ public class PageRawInfo
 
 public class PdfPagingWorker
 {
-    public void  savePagingPDF(string srcFile, string destFile,bool bFreeLicense,List<PageInfo>pages)
+    public void  savePagingPDF(string srcFile, string destFile,List<PageInfo>pages)
     {
         //ページングの結果を新しいPDFファイルに保存
         using (var fs = new FileStream(destFile, FileMode.Create))
@@ -296,15 +292,14 @@ public class PdfPagingWorker
                 var writer = new PdfCopy(doc, fs);
                 doc.Open();
 
-                if (bFreeLicense)
-                {
-                    //文書のプロパティをセット
-                    // 文書プロパティ設定
-                    writer.Info.Put(PdfName.TITLE, new PdfString("ページング結果"));
-                    writer.Info.Put(PdfName.AUTHOR, new PdfString("OURS SOFT"));
-                    writer.Info.Put(PdfName.SUBJECT, new PdfString("Made by PDFNET -- OURS SOFT"));
-                    writer.Info.Put(PdfName.KEYWORDS, new PdfString("Powered by OURS SOFT"));
-                }
+                //if (bFreeLicense)
+                //{
+                //    // 文書プロパティ設定
+                //    writer.Info.Put(PdfName.TITLE, new PdfString("ページング結果"));
+                //    writer.Info.Put(PdfName.AUTHOR, new PdfString("OURS SOFT"));
+                //    writer.Info.Put(PdfName.SUBJECT, new PdfString("Made by PDFNET -- OURS SOFT"));
+                //    writer.Info.Put(PdfName.KEYWORDS, new PdfString("Powered by OURS SOFT"));
+                //}
 
 
 
@@ -382,7 +377,7 @@ public class PdfPagingWorker
             writer.Close();
         }
     }
-    public void EmbedStamp(string inputPdfPath, string outputPdfPath,string freeLicense, string dsXmlPath)
+    public void EmbedStamp(string inputPdfPath, string outputPdfPath, string dsXmlPath)
     {
         PdfReader reader = new PdfReader(inputPdfPath);
         PdfStamper stamper = new PdfStamper(reader, new FileStream(outputPdfPath, FileMode.Create));
@@ -920,84 +915,13 @@ public class PdfPagingWorker
 
             }
 
-
-            if (freeLicense=="true")
-            {
-                // コンテンツ設定
-                var objPDFContByte = stamper.GetOverContent(pageNumber);
-
-
-                AddLOGO(objPDFContByte);
-                //LOGO
-
-                objPDFContByte = stamper.GetOverContent(pageNumber);
-
-                AddTradeMark(objPDFContByte);
-            }
-
-
         }
 
         stamper.Close();
         reader.Close();
 
     }
-    private void AddLOGO(PdfContentByte objPDFContByte)
-    {
-        iTextSharp.text.Font font =
-FontFactory.GetFont("C:\\WINDOWS\\Fonts\\meiryo.ttc,0",
-BaseFont.IDENTITY_H,            //横書き
-BaseFont.NOT_EMBEDDED,          //フォントを組み込まない
-9,
-iTextSharp.text.Font.NORMAL,
-iTextSharp.text.Color.GRAY);
-
-        ColumnText ct = new ColumnText(objPDFContByte);
-        //(x,y,x+width,y+height,fontsize,align)
-        ct.SetSimpleColumn(14, 10, 250, 20, 0, Element.ALIGN_LEFT);
-        Chunk cnk = new Chunk("            Powered by OURS SOFT", font);
-        cnk.SetAnchor("http://ourssoft.cloudfree.jp/pdfnet/");
-        ct.AddText(cnk);
-        ct.Go();
-
-    }
-    private void AddTradeMark(PdfContentByte objPDFContByte)
-    {
-        //半透明にならない
-        //System.Drawing.Image im = System.Drawing.Image.FromFile(Application.StartupPath + @"\tm.gif");
-
-        //System.Drawing.Imaging.ColorMatrix cm = new System.Drawing.Imaging.ColorMatrix();
-        //cm.Matrix00 = 1;
-        //cm.Matrix11 = 1;
-        //cm.Matrix22 = 1;
-        //cm.Matrix33 = 0.2F;
-        //cm.Matrix44 = 1;
-        //var ia = new System.Drawing.Imaging.ImageAttributes();
-        //ia.SetColorMatrix(cm);
-        //var canvas = new Bitmap(im.Width, im.Height);
-        //var g = Graphics.FromImage(canvas);
-        //g.DrawImage(im, new System.Drawing.Rectangle(0, 0, im.Width, im.Height), 0, 0, im.Width, im.Height, GraphicsUnit.Pixel, ia);
-        //im.Dispose();
-        //g.Dispose();
-
-        //var img = iTextSharp.text.Image.GetInstance(canvas, System.Drawing.Imaging.ImageFormat.Gif);
-        // 埋め込みリソースから読み込む例
-        Assembly asm = Assembly.GetExecutingAssembly();
-        using (Stream s = asm.GetManifestResourceStream("PDFNETWorker.tm.gif"))
-        {
-            var img = iTextSharp.text.Image.GetInstance(s);
-            img.SetAbsolutePosition(14, 10);
-            img.ScaleAbsolute(32, 32);
-            //画像を薄くする
-            PdfGState gs1 = new PdfGState();
-            gs1.FillOpacity = 0.2F;
-            objPDFContByte.SetGState(gs1);
-            objPDFContByte.AddImage(img);
-        }
-
-
-    }
-
+    
     private System.Drawing.SizeF WordsAreaSizeOnPDF(  string Font, string text, float Size, int Style,  PdfContentByte cb, bool isMultiLine)
     {
         FontFactory.RegisterDirectory(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), true);

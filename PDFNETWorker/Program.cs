@@ -4,10 +4,12 @@ using Ghostscript.NET.Rasterizer;
 using iTextSharp.text;
 using iTextSharp.text.exceptions;//5.5
 using iTextSharp.text.pdf;
-
+using iTextSharp.text.pdf.parser;
 
 using Newtonsoft.Json;
 using Org.BouncyCastle.X509.Extension;
+
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -16,7 +18,10 @@ using System.Drawing;
 using System.Linq;
 using System.Reflection;
 using System.Runtime;
+using System.Security.Cryptography;
 using System.Text;
+
+
 
 class Program
 {
@@ -56,13 +61,13 @@ class Program
 
 
 
-        string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-        string path = Path.Combine(desktop, "worker_test.txt");
-        string log = "Is64BitProcess=" + Environment.Is64BitProcess + "\r\n" +
-            "User=" + Environment.UserName + "\r\n" +
-            "WorkingSet=" + Process.GetCurrentProcess().WorkingSet64;
+        //string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        //string path = Path.Combine(desktop, "worker_test.txt");
+        //string log = "Is64BitProcess=" + Environment.Is64BitProcess + "\r\n" +
+        //    "User=" + Environment.UserName + "\r\n" +
+        //    "WorkingSet=" + Process.GetCurrentProcess().WorkingSet64;
 
-        File.WriteAllText(path,log );
+        //File.WriteAllText(path,log );
         GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
 
         int result = RunWorker(args);
@@ -84,9 +89,13 @@ class Program
 
 #if DEBUG
         //          args = new string[] { "pdf2png", @"C:\Users\takes\OneDrive\デスクトップ\図面１ - コピー.pdf", @"C:\Users\takes\AppData\Local\Temp\a5947e51-e9a8-4a8a-9dfd-6804df66031d.tmp" };
-        //   args = new string[] { "merge", @"C:\Users\takes\OneDrive\デスクトップ\protect.pdf?", @"C:\Users\takes\AppData\Local\Temp\a5947e51-e9a8-4a8a-9dfd-6804df66031d.tmp" };
+        //   args = new string[] { "merge", @"C:\Users\takes\OneDrive\デスクトップ\kyuyofukuro.pdf?", @"C:\Users\takes\AppData\Local\Temp\a5947e51-e9a8-4a8a-9dfd-6804df66031d.tmp" };
+        //  args = new string[] { "merge", @"C:\Users\takes\OneDrive\デスクトップ\kyuyofukuro.pdf?"};
+        //  args = new string[] { "gettext", @"C:\Users\takes\OneDrive\デスクトップ\b.pdf","1",@"C:\Users\takes\OneDrive\デスクトップ\PDFNET_SAMPLE\sample-multilingual-text.json" };
+//        args = new string[] { "gettagtext", @"C:\Users\takes\OneDrive\デスクトップ\b.pdf", "1", @"C:\Users\takes\OneDrive\デスクトップ\PDFNET_SAMPLE\sample-multilingual-text.json" };
+
         // args = new string[] { "pdf2png", @"C:\Users\takes\OneDrive\デスクトップ\protect.pdf?aaaaaa", @"C:\Users\takes\AppData\Local\Temp\a5947e51-e9a8-4a8a-9dfd-6804df66031d.tmp", @"C:\Users\takes\AppData\Local\Temp\tmp.json" };
-      //  args = new string[] { "stamp", @"C:\Users\takes\OneDrive\デスクトップ\_blank.pdf.paging", @"C:\Users\takes\OneDrive\デスクトップ\_blank.pdf", @"C:\Users\takes\AppData\Local\Temp\tmpjusthd.tmp" };
+        //  args = new string[] { "stamp", @"C:\Users\takes\OneDrive\デスクトップ\_blank.pdf.paging", @"C:\Users\takes\OneDrive\デスクトップ\_blank.pdf", @"C:\Users\takes\AppData\Local\Temp\tmpjusthd.tmp" };
 
 #endif
 
@@ -110,6 +119,55 @@ class Program
             default:
                 Console.Error.WriteLine("Usage: PDFNETWorker.exe <EnableCommand> ");
                 return 1;
+            case "gettext":
+                {
+                    if (args.Length < 4)
+                    {
+                        Console.Error.WriteLine("Usage: PDFNETWorker.exe gettext <targetFilePath> <PageNumber> <outputJson>");
+                        return 1;
+                    }
+
+                    string file = args[1];
+                    int page = int.Parse(args[2]);//1 base
+                    string outputJson = args[3];
+
+                    var extractor = new WorkerTextExtractor();
+                    var doc = extractor.Extract(file);
+                    //foreach (var p in doc.Pages)
+                    //{
+                    //    Trace.WriteLine($"PageNumber={p.PageNumber}, TextLength={p.Items.Count()}");
+                    //}
+                    
+                    var pageInfo = doc.Pages.FirstOrDefault(p => p.PageNumber == page);
+                    string fullText = string.Join("", pageInfo.Items.Select(i => i.Text));
+                    // JSON で返す
+                    //File.WriteAllText(outputJson, JsonConvert.SerializeObject(pageInfo, Formatting.Indented));
+                    File.WriteAllText(outputJson, fullText);
+
+                    //Console.WriteLine(JsonConvert.SerializeObject(pageInfo, Formatting.Indented));
+                    return 0;
+                }
+            case "gettagtext":
+                {
+                    if (args.Length < 3)
+                    {
+                        Console.Error.WriteLine("Usage: PDFNETWorker.exe gettext <targetFilePath> <outputJson>");
+                        return 1;
+                    }
+
+                    string file = args[1];
+                    string outputJson = args[2];
+
+                    var extractor = new WorkerTextExtractor();
+                    var doc = extractor.Extract(file);
+
+                    // JSON で返す
+                    File.WriteAllText(outputJson, JsonConvert.SerializeObject(doc.Pages, Formatting.Indented));
+
+                    return 0;
+                }
+
+
             case "2in1":
                 {
                     if (args.Length < 4)
@@ -195,7 +253,7 @@ class Program
                 {
                     if (args.Length < 4)
                     {
-                        Console.Error.WriteLine("Usage: PDFNETWorker.exe stamp <read> <dest> <xml>");
+                        Console.Error.WriteLine("Usage: PDFNETWorker.exe stamp <read> <dest> <xml> <EncryptNumber>");
                         return 1;
                     }
 
@@ -203,11 +261,14 @@ class Program
                     string dest = args[2];
                     
                     string xml = args[3];
+                    string encryptno = "";
+                    if(args.Length > 4) encryptno = args[4];
+
 
                     try
                     {
                         var worker = new PdfPagingWorker();
-                        worker.EmbedStamp(read, dest, xml);
+                        worker.EmbedStamp(read, dest, xml,encryptno);
                         return 0;
                     }
                     catch (Exception ex)
@@ -236,8 +297,24 @@ class Program
                         // ★ JSON で返す
                         Console.WriteLine(JsonConvert.SerializeObject(result));
 
-                        if (result.Success == false && result.Message.Contains("Password")) return 3;
+                        if (result.Success == false)
+                        {
+                            if (result.Message.Contains("Password"))
+                            {
+                                Console.Error.WriteLine("パスワードが違います");
 
+                                return 3;
+                            }
+                            else
+                            {
+                                if (result.Message.Contains("CantOpen"))
+                                {
+                                    Console.Error.WriteLine("このファイルは編集モードで開けません");
+
+                                    return 2;
+                                }
+                            }
+                        }
 
                         return 0;
                     }
@@ -480,6 +557,13 @@ public static class PageSizeResolver
         throw new ArgumentException($"Unknown paper size: {name}");
     }
 }
+public class PdfEncryptionSettings
+{
+    public string UserPassword { get; set; }
+    public string OwnerPassword { get; set; }
+    public int Permissions { get; set; }
+    public int EncryptionType { get; set; }
+}
 
 public class PaperInfo
 {
@@ -487,7 +571,214 @@ public class PaperInfo
     public float Width { get; set; }
     public float Height { get; set; }
 }
+public class PdfTextItem
+{
+    public string Text { get; set; }
+    public float X { get; set; }        // ページ座標系（左下原点）
+    public float Y { get; set; }
+    public float Angle { get; set; }    // 度数（0 = 水平, 反時計回りが正）
+    public string Tag { get; set; }     // BDCタグ名（なければ null）
+}
 
+public class PdfPageTextInfo
+{
+    public int PageNumber { get; set; }
+    public List<PdfTextItem> Items { get; set; } = new List<PdfTextItem>();
+}
+
+public class PdfDocumentTextInfo
+{
+    public string FilePath { get; set; }
+    
+    public List<PdfPageTextInfo> Pages { get; set; } = new List<PdfPageTextInfo>();
+}
+
+public class WorkerTextListener : IExtRenderListener
+{
+    private readonly PdfPageTextInfo _pageInfo;
+    private string _currentTag = null;
+
+    public WorkerTextListener(PdfPageTextInfo pageInfo)
+    {
+        _pageInfo = pageInfo;
+    }
+
+    // ---- IRenderListener ----
+
+    public void RenderText(TextRenderInfo renderInfo)
+    {
+        string text = renderInfo.GetText();
+        if (string.IsNullOrEmpty(text))
+            return;
+
+        // 座標（ベースラインの開始点）
+        var baseline = renderInfo.GetBaseline();
+        var start = baseline.GetStartPoint();
+        var end = baseline.GetEndPoint();
+
+        float x = start[Vector.I1];
+        float y = start[Vector.I2];
+
+        // 角度を計算（ラジアン -> 度）
+        float dx = end[Vector.I1] - start[Vector.I1];
+        float dy = end[Vector.I2] - start[Vector.I2];
+        float angleRad = (float)Math.Atan2(dy, dx);
+        float angleDeg = angleRad * 180f / (float)Math.PI;
+
+        var item = new PdfTextItem
+        {
+            Text = text,
+            X = x,
+            Y = y,
+            Angle = angleDeg,
+            Tag = _currentTag
+        };
+
+        _pageInfo.Items.Add(item);
+    }
+
+    public void RenderImage(ImageRenderInfo renderInfo)
+    {
+        // 今回は画像は無視
+    }
+
+    public void BeginTextBlock()
+    {
+    }
+
+    public void EndTextBlock()
+    {
+    }
+
+    // ---- IExtRenderListener (Marked Content 用) ----
+
+    public void BeginMarkedContent(PdfName tag, PdfDictionary dict)
+    {
+        // /FieldName → "FieldName" のように加工
+        _currentTag = tag != null ? tag.ToString().TrimStart('/') : null;
+    }
+
+    public void EndMarkedContent()
+    {
+        _currentTag = null;
+    }
+
+    public void BeginMarkedContentSequence(PdfName tag, PdfDictionary dict)
+    {
+        BeginMarkedContent(tag, dict);
+    }
+
+    public void EndMarkedContentSequence()
+    {
+        EndMarkedContent();
+    }
+    public void ModifyPath(PathConstructionRenderInfo renderInfo)
+    {
+        // パス（線・図形）には興味がないので空実装でOK
+    }
+    public iTextSharp.text.pdf.parser.Path RenderPath(PathPaintingRenderInfo renderInfo)
+    {
+        // 図形の描画（線・塗りつぶし）は無視
+        return null;
+    }
+    public void ClipPath(int rule)
+    {
+        // クリッピングパスも無視
+    }
+
+
+}
+
+public class WorkerTextExtractor
+{
+    public PdfDocumentTextInfo Extract_OLD(string pdfPath)
+    {
+        var result = new PdfDocumentTextInfo
+        {
+            FilePath = pdfPath
+        };
+
+        using (var reader = new PdfReader(pdfPath))
+        {
+            int pageCount = reader.NumberOfPages;
+
+            for (int page = 1; page <= pageCount; page++)
+            {
+                var pageInfo = new PdfPageTextInfo
+                {
+                    PageNumber = page
+                };
+
+                // リスナーをページ単位で作成
+                var listener = new WorkerTextListener(pageInfo);
+                var processor = new PdfContentStreamProcessor(listener);
+
+                PdfDictionary pageDic = reader.GetPageN(page);
+                PdfDictionary resources = pageDic.GetAsDict(PdfName.RESOURCES);
+                byte[] contentBytes = reader.GetPageContent(page);
+
+                processor.ProcessContent(contentBytes, resources);
+
+                result.Pages.Add(pageInfo);
+            }
+        }
+
+        return result;
+    }
+
+    public PdfDocumentTextInfo Extract(string filePath)
+    {
+        var result = new PdfDocumentTextInfo
+        {
+            FilePath = filePath
+        };
+
+        using (var reader = new PdfReader(filePath))
+        {
+
+
+            int totalPages = reader.NumberOfPages;
+
+            for (int page = 1; page <= totalPages; page++)
+            {
+                var bytes = ContentByteUtils.GetContentBytesForPage(reader, page);
+                Trace.WriteLine(Encoding.UTF8.GetString(bytes));
+
+
+                var strategy = new TaggedTextExtractionStrategy();
+                var processor = new PdfContentStreamProcessor(strategy);
+
+                // BDC / EMC をフック
+                processor.RegisterContentOperator("BDC", new BdcOperator(strategy.TagStack));
+                processor.RegisterContentOperator("EMC", new EmcOperator(strategy.TagStack));
+
+
+
+                PdfDictionary pageDic = reader.GetPageN(page);
+                PdfDictionary resourcesDic = pageDic.GetAsDict(PdfName.RESOURCES);
+
+                processor.ProcessContent(
+                    ContentByteUtils.GetContentBytesForPage(reader, page),
+                    resourcesDic
+                );
+
+                var pageInfo = new PdfPageTextInfo
+                {
+                    PageNumber = page,
+                    Items = strategy.Items
+                        .OrderByDescending(i => i.Y)
+                        .ThenBy(i => i.X)
+                        .ToList()
+                };
+
+                result.Pages.Add(pageInfo);
+            }
+        }
+
+        return result;
+    }
+
+}
 
 public class PdfPagingWorker
 {
@@ -569,6 +860,8 @@ public class PdfPagingWorker
         }
 
     }
+    string EncryptSettingPath =System.IO. Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), $"PDFNET_Encrypt_settings.json");
+
     public void savePagingPDF(string srcFile, string destFile, List<PageInfo> pages)
     {
         using (var reader = new PdfReader(srcFile))
@@ -673,13 +966,36 @@ public class PdfPagingWorker
 
         }
     }
-    public void EmbedStamp(string inputPdfPath, string outputPdfPath, string dsXmlPath)
+    public void EmbedStamp(string inputPdfPath, string outputPdfPath, string dsXmlPath,string EncryptNo)
     {
-        
 
         using (var reader = new PdfReader(inputPdfPath))
         using (PdfStamper stamper = new PdfStamper(reader, new FileStream(outputPdfPath, FileMode.Create)))
         {
+            if (EncryptNo.Length > 0 &&            File.Exists(EncryptSettingPath))
+                {
+                    byte[] encrypted = File.ReadAllBytes(EncryptSettingPath);
+
+                    byte[] decrypted = ProtectedData.Unprotect(
+                        encrypted,
+                        null,
+                        DataProtectionScope.CurrentUser
+                    );
+
+                   var json = Encoding.UTF8.GetString(decrypted);
+                
+                var settingsList = JsonConvert.DeserializeObject<List<PdfEncryptionSettings>>(json)
+                               ?? new List<PdfEncryptionSettings>();
+
+                var settings = settingsList[int.Parse(EncryptNo)];
+
+                stamper.SetEncryption(
+                  Encoding.UTF8.GetBytes(settings.UserPassword),
+                  Encoding.UTF8.GetBytes(settings.OwnerPassword),
+                  settings.Permissions,
+                  settings.EncryptionType
+              );
+            }
             DataSet dataSet1 = new DataSet();
             dataSet1.ReadXml(dsXmlPath);
 
@@ -870,12 +1186,17 @@ public class PdfPagingWorker
                     int textRotation = Convert.ToInt16(row["Rotation"]);
                     string url = row["URL"].ToString();
                     string id = row["ID"].ToString();
-
-
-
-
+                    string FieldName = "";
+                    try
+                    {
+                        FieldName = row["FieldName"] as string ?? "";
+                    }
+                    catch { }
+                    //int Width = Convert.ToInt16(row["Width"]);//Field用
+                    //int Height = Convert.ToInt16(row["Height"]);//Field用
 
                     System.Drawing.Color ColorARGB = System.Drawing.Color.FromArgb((int)lColor);
+
 
                     PdfContentByte cb = stamper.GetOverContent(pageNumber);
 
@@ -1007,6 +1328,14 @@ public class PdfPagingWorker
 
                     //ShowTextAlignedの場合
                     // テキスト描画開始
+                    if (!string.IsNullOrEmpty(FieldName))
+                    {
+                        //BMCが出る。タグが取れない
+                        //                        cb.BeginMarkedContentSequence(new PdfName(FieldName)); 
+                        cb.InternalBuffer.Append(Encoding.ASCII.GetBytes($"/{FieldName} <</MCID 0>> BDC\n"));
+
+                    }
+
                     cb.BeginText();
 
                     float drawX = pdfX;
@@ -1116,6 +1445,7 @@ public class PdfPagingWorker
                         {
                             cb.SetTextMatrix(lineX, lineY);
                             cb.ShowText(line);
+
                             //負荷が高いらしい
                             //角度変更なしならテキストを単純出力
                             //cb.ShowTextAligned(
@@ -1128,6 +1458,7 @@ public class PdfPagingWorker
                         }
                         else
                         {
+                            if (!string.IsNullOrEmpty(FieldName)) cb.BeginMarkedContentSequence(new PdfName(FieldName));
 
                             cb.ShowTextAligned(
                                 Element.ALIGN_LEFT,
@@ -1136,12 +1467,19 @@ public class PdfPagingWorker
                                 lineY,
                                 -totalDeg // 角度はそのまま
                             );
+                            if (!string.IsNullOrEmpty(FieldName)) cb.EndMarkedContentSequence();
+
                         }
                     }
 
 
                     cb.EndText();
-
+                    if (!string.IsNullOrEmpty(FieldName))
+                    {
+                        //BMCのクローズになる
+                        //cb.EndMarkedContentSequence();
+                        cb.InternalBuffer.Append(Encoding.ASCII.GetBytes("EMC\n"));
+                    }
 
 
 
@@ -1331,7 +1669,7 @@ public class PdfPagingWorker
             )
             {
                 clsPDF cls = new clsPDF();
-                newPdf = Path.GetTempPath() + Path.GetRandomFileName() + ".pdf";
+                newPdf =System.IO. Path.GetTempPath() + System.IO.Path.GetRandomFileName() + ".pdf";
                 cls.bitmap_to_pdf(new string[] { droppedFile }, newPdf);
             }
             else
@@ -1341,11 +1679,11 @@ public class PdfPagingWorker
                     )
                 {
                     clsPDF cls = new clsPDF();
-                    string tmpTIF = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+                    string tmpTIF = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.IO.Path.GetRandomFileName());
                     Directory.CreateDirectory(tmpTIF);
                     cls.ConvertMultipageTifToBmpKeepDpi(droppedFile, tmpTIF);
                     string[] files = Directory.GetFiles(tmpTIF, "*.bmp");
-                    newPdf = Path.GetTempPath() + Path.GetRandomFileName() + ".pdf";
+                    newPdf = System.IO.Path.GetTempPath() + System.IO.Path.GetRandomFileName() + ".pdf";
                     cls.bitmap_to_pdf(files, newPdf);
 
                 }
@@ -1402,7 +1740,7 @@ public class PdfPagingWorker
             catch (Exception ex)
             {
 
-                File.Delete(Config.tempPdfPath);
+                //File.Delete(Config.tempPdfPath);
                 //"Bad user password"
                 if (ex.Message.Contains("password") ||
     ex.Message.Contains("rangecheck"))
@@ -1418,8 +1756,8 @@ public class PdfPagingWorker
 
                 return new WorkerResult
                 {
-                    Success = true,
-                    Message = $"no PDF file\n{ex.ToString()}",
+                    Success = false,
+                    Message = $"CantOpen\n{ex.ToString()}",
 
                 };
 
@@ -1486,8 +1824,8 @@ ex.Message.Contains("rangecheck"))
 
             return new WorkerResult
             {
-                Success = true,
-                Message = $"no PDF file\n{ex.ToString()}",
+                Success = false,
+                Message = $"CantOpen\n{ex.ToString()}",
 
             };
 
@@ -1501,9 +1839,9 @@ ex.Message.Contains("rangecheck"))
     }
     private string decryptFilePath(string targetFilePath)
     {
-        return Path.Combine(
-            Path.GetDirectoryName(targetFilePath),
-            Path.GetFileNameWithoutExtension(targetFilePath) + "_d" + Path.GetExtension(targetFilePath)
+        return System.IO.Path.Combine(
+            System.IO.Path.GetDirectoryName(targetFilePath),
+            System.IO.Path.GetFileNameWithoutExtension(targetFilePath) + "_d" + System.IO.Path.GetExtension(targetFilePath)
             );
     }
     public WorkerResult GetPageRotation(string pdfFilePath, int pageNumber)
@@ -1650,15 +1988,15 @@ ex.Message.Contains("rangecheck"))
             string rasterizePath = (password == "") ? pdfFilePath : decryptFilePath(pdfFilePath);
             
 
-            string exeDir = Path.GetDirectoryName(
+            string exeDir = System.IO.Path.GetDirectoryName(
                 Process.GetCurrentProcess().MainModule.FileName
             );
 
             var version = new GhostscriptVersionInfo(
-                Path.Combine(exeDir, "gsdll64.dll")
+                System.IO.Path.Combine(exeDir, "gsdll64.dll")
             );
 
-            string tempPath = Path.Combine(Path.GetTempPath(), Path.GetFileName(pdfFilePath));
+            string tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.IO.Path.GetFileName(pdfFilePath));
             if (pdfFilePath != tempPath) File.Copy(pdfFilePath, tempPath, true);
 
             using var rasterizer = new GhostscriptRasterizer();
@@ -1748,4 +2086,100 @@ ex.Message.Contains("rangecheck"))
 
         return loadPagesRaw;
     }
+}
+
+//public class TaggedTextExtractionStrategy : IExtRenderListener
+//{
+//    private Stack<string> tagStack = new Stack<string>();
+//    public List<PdfTextItem> Items { get; } = new List<PdfTextItem>();
+
+//    public void BeginMarkedContentSequence(PdfName tag, PdfDictionary dict)
+//    {
+//        tagStack.Push(tag.ToString().TrimStart('/'));
+//    }
+
+//    public void EndMarkedContentSequence()
+//    {
+//        if (tagStack.Count > 0)
+//            tagStack.Pop();
+//    }
+
+//    public void RenderText(TextRenderInfo renderInfo)
+//    {
+//        var baseline = renderInfo.GetBaseline().GetStartPoint();
+
+//        Items.Add(new PdfTextItem
+//        {
+//            Text = renderInfo.GetText(),
+//            X = baseline[0],
+//            Y = baseline[1],
+//            Angle = 0,
+//            Tag = tagStack.Count > 0 ? tagStack.Peek() : null
+//        });
+//    }
+
+//    public void BeginTextBlock() { }
+//    public void EndTextBlock() { }
+//    public void RenderImage(ImageRenderInfo renderInfo) { }
+//    public void ModifyPath(PathConstructionRenderInfo renderInfo) { }
+//    public void ClipPath(int rule) { }
+//    public iTextSharp.text.pdf.parser. Path RenderPath(PathPaintingRenderInfo renderInfo) { return null; }
+//}
+
+public class BdcOperator : IContentOperator
+{
+    private readonly Stack<string> tagStack;
+
+    public BdcOperator(Stack<string> tagStack)
+    {
+        this.tagStack = tagStack;
+    }
+
+    public void Invoke(PdfContentStreamProcessor processor, PdfLiteral oper, List<PdfObject> operands)
+    {
+        // operands[0] = /namae
+        var tag = operands[0] as PdfName;
+        if (tag != null)
+        {
+            tagStack.Push(tag.ToString().TrimStart('/'));
+        }
+    }
+}
+public class EmcOperator : IContentOperator
+{
+    private readonly Stack<string> tagStack;
+
+    public EmcOperator(Stack<string> tagStack)
+    {
+        this.tagStack = tagStack;
+    }
+
+    public void Invoke(PdfContentStreamProcessor processor, PdfLiteral oper, List<PdfObject> operands)
+    {
+        if (tagStack.Count > 0)
+            tagStack.Pop();
+    }
+}
+public class TaggedTextExtractionStrategy : IRenderListener
+{
+    public Stack<string> TagStack { get; } = new Stack<string>();
+    public List<PdfTextItem> Items { get; } = new List<PdfTextItem>();
+
+    public void RenderText(TextRenderInfo renderInfo)
+    {
+        var baseline = renderInfo.GetBaseline().GetStartPoint();
+
+        Items.Add(new PdfTextItem
+        {
+            Text = renderInfo.GetText(),
+            X = baseline[0],
+            Y = baseline[1],
+            Angle = 0,
+            Tag = TagStack.Count > 0 ? TagStack.Peek() : null
+        });
+    }
+
+    public void BeginTextBlock() { }
+    public void EndTextBlock() { }
+    public void RenderImage(ImageRenderInfo renderInfo) { }
 }
